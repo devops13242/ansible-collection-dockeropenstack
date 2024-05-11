@@ -1,0 +1,19 @@
+---
+- name: Create a rabbitmq volume
+  community.docker.docker_volume:
+    name: rabbitmq
+
+- name: Run a rabbitmq container
+  community.docker.docker_container:
+    name: rabbitmq
+    image: rabbitmq:3.13.2-alpine
+    state: started
+    networks:
+      - name: openstack
+    ports:
+      - "5672:5672"
+    env:
+      RABBITMQ_DEFAULT_USER: "{{ RABBITMQ_DEFAULT_USER }}"
+      RABBITMQ_DEFAULT_PASS: "{{ RABBITMQ_DEFAULT_PASSWORD }}"
+    volumes:
+      - rabbitmq:/var/lib/rabbitmq

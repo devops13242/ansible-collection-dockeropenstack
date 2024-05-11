@@ -10,9 +10,12 @@
     GLANCE_USER_PASSWORD: "{{ lookup('ansible.builtin.env', 'GLANCE_USER_PASSWORD') }}"
     PLACEMENT_DB_PASSWORD: "{{ lookup('ansible.builtin.env', 'PLACEMENT_DB_PASSWORD') }}"
     PLACEMENT_USER_PASSWORD: "{{ lookup('ansible.builtin.env', 'PLACEMENT_USER_PASSWORD') }}"
+    RABBITMQ_DEFAULT_USER: "{{ lookup('ansible.builtin.env', 'RABBITMQ_DEFAULT_USER') }}"
+    RABBITMQ_DEFAULT_PASSWORD: "{{ lookup('ansible.builtin.env', 'RABBITMQ_DEFAULT_PASSWORD') }}"
   roles:
     - role: network
     - role: db
     - role: keystone
     - role: glance
     - role: placement
+    - role: rabbitmq
