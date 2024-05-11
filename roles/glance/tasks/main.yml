@@ -1,0 +1,95 @@
+- name: Create a new database with name 'glance'
+  community.mysql.mysql_db:
+    name: glance
+    state: present
+    login_host: 127.0.0.1
+    login_user: root
+    login_password: "{{ MARIADB_ROOT_PASSWORD }}"
+  retries: 3
+  delay: 3
+
+- name: Create a 'glance'@'localhost' user with password, all database privileges and 'WITH GRANT OPTION' in glance
+  community.mysql.mysql_query:
+    query: "GRANT ALL PRIVILEGES ON glance.* TO 'glance'@'localhost' IDENTIFIED BY '{{ GLANCE_DB_PASSWORD }}';"
+    login_host: 127.0.0.1
+    login_user: root
+    login_password: "{{ MARIADB_ROOT_PASSWORD }}"
+
+- name: Create a 'glance'@'%' user with password, all database privileges and 'WITH GRANT OPTION' in glance
+  community.mysql.mysql_query:
+    query: "GRANT ALL PRIVILEGES ON glance.* TO 'glance'@'%' IDENTIFIED BY '{{ GLANCE_DB_PASSWORD }}';"
+    login_host: 127.0.0.1
+    login_user: root
+    login_password: "{{ MARIADB_ROOT_PASSWORD }}"
+
+- name: Flush privileges for glance
+  community.mysql.mysql_query:
+    query: "FLUSH PRIVILEGES;"
+    login_host: 127.0.0.1
+    login_user: root
+    login_password: "{{ MARIADB_ROOT_PASSWORD }}"
+  
+- name: Create a user glance
+  openstack.cloud.identity_user:
+    state: present
+    name: glance
+    password: "{{ GLANCE_USER_PASSWORD }}"
+    domain: default
+
+- name: Grant an admin role on the user glance in the project service
+  openstack.cloud.role_assignment:
+    user: glance
+    role: admin
+    project: service
+
+- name: Create a service for glance
+  openstack.cloud.catalog_service:
+     state: present
+     name: glance
+     type: image
+     description: OpenStack Image
+
+- name: Create the Image service public
+  openstack.cloud.endpoint:
+     service: glance
+     endpoint_interface: public
+     url: http://localhost:9292
+     region: RegionOne
+     state: present
+  register: public_endpoint
+
+- name: Create the Image service internal
+  openstack.cloud.endpoint:
+     service: glance
+     endpoint_interface: internal
+     url: http://glance:9292
+     region: RegionOne
+     state: present
+
+- name: Create the Image service admin
+  openstack.cloud.endpoint:
+     service: glance
+     endpoint_interface: admin
+     url: http://localhost:9292
+     region: RegionOne
+     state: present
+
+- name: Build glance image
+  community.docker.docker_image_build:
+    name: glance:28.0.1
+    path: "{{playbook_dir}}/dockers/glance"
+    dockerfile: Dockerfile
+
+- name: Run a glance container
+  community.docker.docker_container:
+    name: glance
+    image: glance:28.0.1
+    state: started
+    networks:
+      - name: openstack
+    ports:
+      - "9292:9292"
+    env:
+      GLANCE_DB_PASSWORD: "{{ GLANCE_DB_PASSWORD }}"
+      GLANCE_USER_PASSWORD: "{{ GLANCE_USER_PASSWORD }}"
+      GLANCE_ENDPOINT_ID: "{{ public_endpoint.endpoint.id }}"

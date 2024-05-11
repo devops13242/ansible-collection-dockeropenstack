@@ -1,0 +1,18 @@
+---
+- name: Create a db volume
+  community.docker.docker_volume:
+    name: db
+
+- name: Run a db container
+  community.docker.docker_container:
+    name: db
+    image: mariadb
+    state: started
+    networks:
+      - name: openstack
+    ports:
+      - "3306:3306"
+    env:
+      MARIADB_ROOT_PASSWORD: "{{ MARIADB_ROOT_PASSWORD }}"
+    volumes:
+      - db:/var/lib/mysql

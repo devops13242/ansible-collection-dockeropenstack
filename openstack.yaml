@@ -1,0 +1,15 @@
+---
+- name: Install openstack
+  hosts: localhost
+  connection: local
+  vars:
+    MARIADB_ROOT_PASSWORD: "{{ lookup('ansible.builtin.env', 'MARIADB_ROOT_PASSWORD') }}"
+    KEYSTONE_DB_PASSWORD: "{{ lookup('ansible.builtin.env', 'KEYSTONE_DB_PASSWORD') }}"
+    ADMIN_PASSWORD: "{{ lookup('ansible.builtin.env', 'ADMIN_PASSWORD') }}"
+    GLANCE_DB_PASSWORD: "{{ lookup('ansible.builtin.env', 'GLANCE_DB_PASSWORD') }}"
+    GLANCE_USER_PASSWORD: "{{ lookup('ansible.builtin.env', 'GLANCE_USER_PASSWORD') }}"
+  roles:
+    - role: network
+    - role: 1-db
+    - role: 2-keystone
+    - role: glance

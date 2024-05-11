@@ -1,0 +1,73 @@
+---
+- name: Install python3-pymysql
+  become: true
+  become_user: root
+  ansible.builtin.package:
+    name: python3-pymysql
+    state: present
+
+- name: Create a new dastabase with name 'keystone'
+  community.mysql.mysql_db:
+    name: keystone
+    state: present
+    login_host: 127.0.0.1
+    login_user: root
+    login_password: "{{ MARIADB_ROOT_PASSWORD }}"
+  retries: 3
+  delay: 3
+
+- name: Create a 'keystone'@'localhost' user with password, all database privileges and 'WITH GRANT OPTION' in keystone
+  community.mysql.mysql_query:
+    query: "GRANT ALL PRIVILEGES ON keystone.* TO 'keystone'@'localhost' IDENTIFIED BY '{{ KEYSTONE_DB_PASSWORD }}';"
+    login_host: 127.0.0.1
+    login_user: root
+    login_password: "{{ MARIADB_ROOT_PASSWORD }}"
+
+- name: Create a 'keystone'@'%' user with password, all database privileges and 'WITH GRANT OPTION' in keystone
+  community.mysql.mysql_query:
+    query: "GRANT ALL PRIVILEGES ON keystone.* TO 'keystone'@'%' IDENTIFIED BY '{{ KEYSTONE_DB_PASSWORD }}';"
+    login_host: 127.0.0.1
+    login_user: root
+    login_password: "{{ MARIADB_ROOT_PASSWORD }}"
+
+- name: Flush privileges for keystone
+  community.mysql.mysql_query:
+    query: "FLUSH PRIVILEGES;"
+    login_host: 127.0.0.1
+    login_user: root
+    login_password: "{{ MARIADB_ROOT_PASSWORD }}"
+  
+- name: Build keystone image
+  community.docker.docker_image_build:
+    name: keystone:25.0.0
+    path: "{{playbook_dir}}/dockers/keystone"
+    dockerfile: Dockerfile
+
+- name: Run a keystone container
+  community.docker.docker_container:
+    name: keystone
+    image: keystone:25.0.0
+    state: started
+    networks:
+      - name: openstack
+    ports:
+      - "5000:5000"
+    env:
+      ADMIN_PASSWORD: "{{ ADMIN_PASSWORD }}"
+      KEYSTONE_DB_PASSWORD: "{{ KEYSTONE_DB_PASSWORD }}"
+
+- name: Create a domain example
+  openstack.cloud.identity_domain:
+    state: present
+    name: example
+    description: An Example Domain
+  retries: 3
+  delay: 3
+
+- name: Create a project
+  openstack.cloud.project:
+    description: Service Project
+    domain: default
+    is_enabled: True
+    name: service
+    state: present

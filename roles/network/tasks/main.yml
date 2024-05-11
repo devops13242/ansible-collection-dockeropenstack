@@ -1,0 +1,4 @@
+---
+- name: Create an openstack network
+  docker_network:
+    name: openstack
