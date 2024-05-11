@@ -6,7 +6,7 @@
 - name: Run a db container
   community.docker.docker_container:
     name: db
-    image: mariadb
+    image: mariadb:11.3.2
     state: started
     networks:
       - name: openstack
