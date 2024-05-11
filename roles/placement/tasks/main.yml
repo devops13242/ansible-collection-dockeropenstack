@@ -1,0 +1,94 @@
+---
+- name: Create a new database with name 'placement'
+  community.mysql.mysql_db:
+    name: placement
+    state: present
+    login_host: 127.0.0.1
+    login_user: root
+    login_password: "{{ MARIADB_ROOT_PASSWORD }}"
+  retries: 3
+  delay: 3
+
+- name: Create a 'placement'@'localhost' user with password, all database privileges and 'WITH GRANT OPTION' in placement
+  community.mysql.mysql_query:
+    query: "GRANT ALL PRIVILEGES ON placement.* TO 'placement'@'localhost' IDENTIFIED BY '{{ PLACEMENT_DB_PASSWORD }}';"
+    login_host: 127.0.0.1
+    login_user: root
+    login_password: "{{ MARIADB_ROOT_PASSWORD }}"
+
+- name: Create a 'placement'@'%' user with password, all database privileges and 'WITH GRANT OPTION' in placement
+  community.mysql.mysql_query:
+    query: "GRANT ALL PRIVILEGES ON placement.* TO 'placement'@'%' IDENTIFIED BY '{{ PLACEMENT_DB_PASSWORD }}';"
+    login_host: 127.0.0.1
+    login_user: root
+    login_password: "{{ MARIADB_ROOT_PASSWORD }}"
+
+- name: Flush privileges for placement
+  community.mysql.mysql_query:
+    query: "FLUSH PRIVILEGES;"
+    login_host: 127.0.0.1
+    login_user: root
+    login_password: "{{ MARIADB_ROOT_PASSWORD }}"
+
+- name: Create a user placement
+  openstack.cloud.identity_user:
+    state: present
+    name: placement
+    password: "{{ PLACEMENT_USER_PASSWORD }}"
+    domain: default
+
+- name: Grant an admin role on the user placement in the project service
+  openstack.cloud.role_assignment:
+    user: placement
+    role: admin
+    project: service
+
+- name: Create a service for placement
+  openstack.cloud.catalog_service:
+     state: present
+     name: placement
+     type: placement
+     description: Placement API
+
+- name: Create the Placement service public
+  openstack.cloud.endpoint:
+     service: placement
+     endpoint_interface: public
+     url: http://localhost:8778
+     region: RegionOne
+     state: present
+
+- name: Create the Placement service internal
+  openstack.cloud.endpoint:
+     service: placement
+     endpoint_interface: internal
+     url: http://placement:8778
+     region: RegionOne
+     state: present
+
+- name: Create the Placement service admin
+  openstack.cloud.endpoint:
+     service: placement
+     endpoint_interface: admin
+     url: http://localhost:8778
+     region: RegionOne
+     state: present
+
+- name: Build placement image
+  community.docker.docker_image_build:
+    name: placement:11.0.0
+    path: "{{playbook_dir}}/dockers/placement"
+    dockerfile: Dockerfile
+
+- name: Run a placement container
+  community.docker.docker_container:
+    name: placement
+    image: placement:11.0.0
+    state: started
+    networks:
+      - name: openstack
+    ports:
+      - "8778:8778"
+    env:
+      PLACEMENT_DB_PASSWORD: "{{ PLACEMENT_DB_PASSWORD }}"
+      PLACEMENT_USER_PASSWORD: "{{ PLACEMENT_USER_PASSWORD }}"
