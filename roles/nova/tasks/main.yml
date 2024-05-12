@@ -1,0 +1,196 @@
+---
+- name: "Create a new database {{ item }}"
+  community.mysql.mysql_db:
+    name: "{{ item }}"
+    state: present
+    login_host: 127.0.0.1
+    login_user: root
+    login_password: "{{ MARIADB_ROOT_PASSWORD }}"
+  with_items:
+    - nova_api
+    - nova
+    - nova_cell0
+
+- name: "Grant access to the database {{ item }}.* to 'nova'@'localhost'" 
+  community.mysql.mysql_query:
+    query: "GRANT ALL PRIVILEGES ON {{ item }}.* TO 'nova'@'localhost' IDENTIFIED BY '{{ NOVA_DB_PASSWORD }}';"
+    login_host: 127.0.0.1
+    login_user: root
+    login_password: "{{ MARIADB_ROOT_PASSWORD }}"
+  with_items:
+    - nova_api
+    - nova
+    - nova_cell0
+
+- name: "Grant access to the database {{ item }}.* to 'nova'@'%'" 
+  community.mysql.mysql_query:
+    query: "GRANT ALL PRIVILEGES ON {{ item }}.* TO 'nova'@'%' IDENTIFIED BY '{{ NOVA_DB_PASSWORD }}';"
+    login_host: 127.0.0.1
+    login_user: root
+    login_password: "{{ MARIADB_ROOT_PASSWORD }}"
+  with_items:
+    - nova_api
+    - nova
+    - nova_cell0
+
+- name: Flush privileges for nova
+  community.mysql.mysql_query:
+    query: "FLUSH PRIVILEGES;"
+    login_host: 127.0.0.1
+    login_user: root
+    login_password: "{{ MARIADB_ROOT_PASSWORD }}"
+
+- name: Create a user nova
+  openstack.cloud.identity_user:
+    state: present
+    name: nova
+    password: "{{ NOVA_USER_PASSWORD }}"
+    domain: default
+
+- name: Grant an admin role on the user nova in the project service
+  openstack.cloud.role_assignment:
+    user: nova
+    role: admin
+    project: service
+
+- name: Create a service for nova
+  openstack.cloud.catalog_service:
+     state: present
+     name: nova
+     type: compute
+     description: Openstack Compute
+
+- name: Create the compute service public
+  openstack.cloud.endpoint:
+     service: nova
+     endpoint_interface: public
+     url: http://localhost:8774/v2.1
+     region: RegionOne
+     state: present
+
+- name: Create the compute service internal
+  openstack.cloud.endpoint:
+     service: nova
+     endpoint_interface: internal
+     url: http://nova-api:8774/v2.1
+     region: RegionOne
+     state: present
+
+- name: Create the compute service admin
+  openstack.cloud.endpoint:
+     service: nova
+     endpoint_interface: admin
+     url: http://localhost:8774/v2.1
+     region: RegionOne
+     state: present
+
+- name: Build nova image
+  community.docker.docker_image_build:
+    name: nova:26.3.0
+    path: "{{playbook_dir}}/dockers/nova"
+    dockerfile: Dockerfile
+
+- name: Create nova.conf file
+  ansible.builtin.template:
+    src: "{{ role_path }}/files/nova.conf"
+    dest: ~/nova.conf
+    mode: '0444'
+
+- name: Run a nova-api
+  community.docker.docker_container:
+    name: nova-api
+    image: nova:26.3.0
+    state: started
+    networks:
+      - name: openstack
+    ports:
+      - "8774:8774"
+      - "8775:8775"
+    env:
+      NOVA_DB_PASSWORD: "{{ NOVA_DB_PASSWORD }}"
+      NOVA_USER_PASSWORD: "{{ NOVA_USER_PASSWORD }}"
+    volumes:
+      - ~/nova.conf:/etc/nova/nova.conf
+    command: nova-api
+
+- name: Run a nova container with command nova-manage api_db sync
+  community.docker.docker_container:
+    name: nova-manage-api-db-sync
+    image: nova:26.3.0
+    state: started
+    networks:
+      - name: openstack
+    env:
+      NOVA_DB_PASSWORD: "{{ NOVA_DB_PASSWORD }}"
+      NOVA_USER_PASSWORD: "{{ NOVA_USER_PASSWORD }}"
+    volumes:
+      - ~/nova.conf:/etc/nova/nova.conf
+    command: nova-manage api_db sync
+  retries: 3
+  delay: 3   
+
+- name: Run a nova container with command nova-manage cell_v2 map_cell0
+  community.docker.docker_container:
+    name: nova-manage-cell-v2-map-cell0
+    image: nova:26.3.0
+    state: started
+    networks:
+      - name: openstack
+    env:
+      NOVA_DB_PASSWORD: "{{ NOVA_DB_PASSWORD }}"
+      NOVA_USER_PASSWORD: "{{ NOVA_USER_PASSWORD }}"
+    volumes:
+      - ~/nova.conf:/etc/nova/nova.conf
+    command: nova-manage cell_v2 map_cell0
+  retries: 3
+  delay: 3   
+
+- name: Run a nova container with command nova-manage cell_v2 create_cell --name=cell1 --verbose
+  community.docker.docker_container:
+    name: nova-manage-cell-v2-create-cell-name-cell1-verbose
+    image: nova:26.3.0
+    state: started
+    networks:
+      - name: openstack
+    env:
+      NOVA_DB_PASSWORD: "{{ NOVA_DB_PASSWORD }}"
+      NOVA_USER_PASSWORD: "{{ NOVA_USER_PASSWORD }}"
+    volumes:
+      - ~/nova.conf:/etc/nova/nova.conf
+    command: nova-manage cell_v2 create_cell --name=cell1 --verbose
+  retries: 3
+  delay: 3  
+
+- name: Run a nova container with command nova-manage db sync
+  community.docker.docker_container:
+    name: nova-manage-db-sync
+    image: nova:26.3.0
+    state: started
+    networks:
+      - name: openstack
+    env:
+      NOVA_DB_PASSWORD: "{{ NOVA_DB_PASSWORD }}"
+      NOVA_USER_PASSWORD: "{{ NOVA_USER_PASSWORD }}"
+    volumes:
+      - ~/nova.conf:/etc/nova/nova.conf
+    command: nova-manage db sync
+  retries: 3
+  delay: 3  
+
+- name: "Run a {{ item }}"
+  community.docker.docker_container:
+    name: "{{ item }}"
+    image: nova:26.3.0
+    state: started
+    networks:
+      - name: openstack
+    env:
+      NOVA_DB_PASSWORD: "{{ NOVA_DB_PASSWORD }}"
+      NOVA_USER_PASSWORD: "{{ NOVA_USER_PASSWORD }}"
+    volumes:
+      - ~/nova.conf:/etc/nova/nova.conf
+    command: "{{ item }}"
+  with_items:
+    - nova-scheduler
+    - nova-conductor
+    - nova-novncproxy

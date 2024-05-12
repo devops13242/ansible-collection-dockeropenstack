@@ -12,6 +12,9 @@
     PLACEMENT_USER_PASSWORD: "{{ lookup('ansible.builtin.env', 'PLACEMENT_USER_PASSWORD') }}"
     RABBITMQ_DEFAULT_USER: "{{ lookup('ansible.builtin.env', 'RABBITMQ_DEFAULT_USER') }}"
     RABBITMQ_DEFAULT_PASSWORD: "{{ lookup('ansible.builtin.env', 'RABBITMQ_DEFAULT_PASSWORD') }}"
+    NOVA_DB_PASSWORD: "{{ lookup('ansible.builtin.env', 'NOVA_DB_PASSWORD') }}"
+    NOVA_USER_PASSWORD: "{{ lookup('ansible.builtin.env', 'NOVA_USER_PASSWORD') }}"
+    MY_IP: "{{ lookup('ansible.builtin.env', 'MY_IP') }}"
   roles:
     - role: network
     - role: db
@@ -19,3 +22,4 @@
     - role: glance
     - role: placement
     - role: rabbitmq
+    - role: nova
