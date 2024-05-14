@@ -182,6 +182,7 @@
     name: "{{ item }}"
     image: nova:26.3.0
     state: started
+    restart_policy: always
     networks:
       - name: openstack
     env:

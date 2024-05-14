@@ -15,6 +15,9 @@
     NOVA_DB_PASSWORD: "{{ lookup('ansible.builtin.env', 'NOVA_DB_PASSWORD') }}"
     NOVA_USER_PASSWORD: "{{ lookup('ansible.builtin.env', 'NOVA_USER_PASSWORD') }}"
     MY_IP: "{{ lookup('ansible.builtin.env', 'MY_IP') }}"
+    NEUTRON_DB_PASSWORD: "{{ lookup('ansible.builtin.env', 'NEUTRON_DB_PASSWORD') }}"
+    NEUTRON_USER_PASSWORD: "{{ lookup('ansible.builtin.env', 'NEUTRON_USER_PASSWORD') }}"
+    METADATA_SECRET: "{{ lookup('ansible.builtin.env', 'METADATA_SECRET') }}"
   roles:
     - role: network
     - role: db
@@ -23,3 +26,4 @@
     - role: placement
     - role: rabbitmq
     - role: nova
+    - role: neutron
