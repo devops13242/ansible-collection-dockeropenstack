@@ -90,8 +90,13 @@
     dest: ~/neutron.conf
     mode: '0444'
 
+- name: Create ml2_conf.ini file
+  ansible.builtin.template:
+    src: "{{ role_path }}/files/ml2_conf.ini"
+    dest: ~/ml2_conf.ini
+    mode: '0444'
 
-- name: "Run a meutron-server"
+- name: "Run a neutron-server"
   community.docker.docker_container:
     name: neutron
     image: neutron:24.0.0
@@ -104,7 +109,23 @@
     volumes:
       - ~/metadata_agent.ini:/etc/neutron/metadata_agent.ini
       - ~/neutron.conf:/etc/neutron/neutron.conf
+      - ~/ml2_conf.ini:/etc/neutron/plugins/ml2/ml2_conf.ini
     command: neutron-server
+
+- name: Run a neutron container with command neutron-db-manage .. upgrade head
+  community.docker.docker_container:
+    name: neutron-db-manage-upgrade-head
+    image: neutron:24.0.0
+    state: started
+    networks:
+      - name: openstack
+    volumes:
+      - ~/metadata_agent.ini:/etc/neutron/metadata_agent.ini
+      - ~/neutron.conf:/etc/neutron/neutron.conf
+      - ~/ml2_conf.ini:/etc/neutron/plugins/ml2/ml2_conf.ini
+    command: neutron-db-manage --config-file /etc/neutron/neutron.conf --config-file /etc/neutron/plugins/ml2/ml2_conf.ini upgrade head
+  retries: 3
+  delay: 3 
 
 - name: "Run a {{ item }}"
   community.docker.docker_container:
@@ -117,6 +138,7 @@
     volumes:
       - ~/metadata_agent.ini:/etc/neutron/metadata_agent.ini
       - ~/neutron.conf:/etc/neutron/neutron.conf
+      - ~/ml2_conf.ini:/etc/neutron/plugins/ml2/ml2_conf.ini
     command: "{{ item }}"
   with_items:
     - neutron-openvswitch-agent

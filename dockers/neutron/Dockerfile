@@ -13,10 +13,12 @@ RUN python3 setup.py install
 RUN addgroup neutron
 RUN adduser -S -s /sbin/nologin -G neutron neutron
 
-RUN mkdir /etc/neutron
+RUN mkdir -p /etc/neutron/plugins/ml2/
 RUN chown -R neutron.neutron /etc/neutron
 
 RUN mkdir /var/lib/neutron
 RUN chown -R neutron.neutron /var/lib/neutron
 
 USER neutron
+
+RUN cp /opt/neutron/etc/api-paste.ini /etc/neutron 

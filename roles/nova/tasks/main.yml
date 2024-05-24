@@ -96,6 +96,12 @@
     dest: ~/nova.conf
     mode: '0444'
 
+- name: Create nova-compute.conf file
+  ansible.builtin.template:
+    src: "{{ role_path }}/files/nova-compute.conf"
+    dest: ~/nova-compute.conf
+    mode: '0444'
+
 - name: Run a nova-api
   community.docker.docker_container:
     name: nova-api
@@ -173,6 +179,7 @@
       NOVA_USER_PASSWORD: "{{ NOVA_USER_PASSWORD }}"
     volumes:
       - ~/nova.conf:/etc/nova/nova.conf
+      - ~/nova-compute.conf:/etc/nova/nova-compute.conf
     command: nova-manage db sync
   retries: 3
   delay: 3  
@@ -190,8 +197,48 @@
       NOVA_USER_PASSWORD: "{{ NOVA_USER_PASSWORD }}"
     volumes:
       - ~/nova.conf:/etc/nova/nova.conf
+      - ~/nova-compute.conf:/etc/nova/nova-compute.conf
     command: "{{ item }}"
   with_items:
     - nova-scheduler
     - nova-conductor
     - nova-novncproxy
+
+- name: Build a libvirt image
+  community.docker.docker_image_build:
+    name: libvirt
+    path: "{{playbook_dir}}/dockers/libvirt"
+    dockerfile: Dockerfile
+
+- name: Create a libvirt volume
+  community.docker.docker_volume:
+    name: libvirt
+
+- name: Run a libvirt container
+  community.docker.docker_container:
+    name: libvirt
+    image: libvirt
+    state: started
+    networks:
+      - name: openstack
+    privileged: true
+    restart_policy: always
+    volumes:
+      - libvirt:/var/run
+
+- name: "Run a nova-compute"
+  community.docker.docker_container:
+    name: "nova-compute"
+    image: nova:26.3.0
+    state: started
+    restart_policy: always
+    networks:
+      - name: openstack
+    env:
+      NOVA_DB_PASSWORD: "{{ NOVA_DB_PASSWORD }}"
+      NOVA_USER_PASSWORD: "{{ NOVA_USER_PASSWORD }}"
+    volumes:
+      - ~/nova.conf:/etc/nova/nova.conf
+      - ~/nova-compute.conf:/etc/nova/nova-compute.conf
+      - libvirt:/var/run
+    command: "nova-compute"
